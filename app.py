@@ -163,9 +163,15 @@ def get_base64_image(image_path: str):
             return base64.b64encode(img_file.read()).decode("utf-8")
     return None
 
-def snv(y):
-    return (y - np.mean(y)) / np.std(y)
+def snv(y, eps=1e-12):
+    y = np.array(y, dtype=float)
+    mu = np.mean(y)
+    std = np.std(y)
 
+    if std < eps:
+        return y - mu
+
+    return (y - mu) / std
 def poly_baseline(y, deg=2):
     x = np.arange(len(y))
     coeffs = np.polyfit(x, y, deg)
@@ -254,16 +260,29 @@ def get_lime_top_positive_wavenumbers(res, model, scaler, k=5):
 
 def predict_plastic(signal):
 
-    x = np.array(signal, dtype=float).reshape(1, -1)
+    x = np.array(signal, dtype=float)
+
+    if not np.all(np.isfinite(x)):
+        x = np.nan_to_num(
+            x,
+            nan=np.nanmean(x[np.isfinite(x)]) if np.isfinite(x).any() else 0.0,
+            posinf=np.nanmax(x[np.isfinite(x)]) if np.isfinite(x).any() else 0.0,
+            neginf=np.nanmin(x[np.isfinite(x)]) if np.isfinite(x).any() else 0.0,
+        )
+
+    x = x.reshape(1, -1)
+
+    x = np.nan_to_num(x)
 
     x_scaled = scaler.transform(x)
 
-    proba = model.predict_proba(x_scaled)[0] 
+    x_scaled = np.nan_to_num(x_scaled)
+
+    proba = model.predict_proba(x_scaled)[0]
     idx = np.argmax(proba)
 
-    pred_class = model.classes_[idx]     
-
-    confidence = float(proba[idx] * 100)   
+    pred_class = model.classes_[idx]
+    confidence = float(proba[idx] * 100)
 
     full_names = {
         'PVC': 'Polyvinyl Chloride',
@@ -277,7 +296,6 @@ def predict_plastic(signal):
     }
 
     return pred_class, confidence, full_names.get(pred_class, "Plastic Polymer")
-
 
 if "page" not in st.session_state:
     st.session_state.page = "Home"

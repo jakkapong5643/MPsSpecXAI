@@ -710,7 +710,7 @@ elif st.session_state.page == "Results":
     fig.update_layout(
         template="plotly_dark",
         height=480,
-        xaxis_title="Wavenumber ",
+        xaxis_title="wavelength ",
         yaxis_title="Intensity",
         margin=dict(l=40, r=40, t=40, b=40),
         hovermode="x unified",
@@ -752,7 +752,7 @@ elif st.session_state.page == "Results":
             orientation="h",
             labels={
                 "x": "SHAP Value (Impact on Prediction)",
-                "y": "Wavenumber Region ",
+                "y": "wavelength Region ",
             },
             color=importance,
             color_continuous_scale=[

@@ -1,5 +1,3 @@
-
-
 import os
 import time
 import base64
@@ -172,6 +170,7 @@ def snv(y, eps=1e-12):
         return y - mu
 
     return (y - mu) / std
+
 def poly_baseline(y, deg=2):
     x = np.arange(len(y))
     coeffs = np.polyfit(x, y, deg)
@@ -284,6 +283,10 @@ def predict_plastic(signal):
     pred_class = model.classes_[idx]
     confidence = float(proba[idx] * 100)
 
+    # ✅ เพิ่ม: เก็บ prob ทุก class เป็น %
+    classes = model.classes_
+    proba_dict = {str(cls): float(p * 100) for cls, p in zip(classes, proba)}
+
     full_names = {
         'PVC': 'Polyvinyl Chloride',
         'HDPE': 'High-Density Polyethylene',
@@ -295,7 +298,7 @@ def predict_plastic(signal):
         'PA': 'Polyamide (Nylon)'
     }
 
-    return pred_class, confidence, full_names.get(pred_class, "Plastic Polymer")
+    return pred_class, confidence, full_names.get(pred_class, "Plastic Polymer"), proba_dict
 
 if "page" not in st.session_state:
     st.session_state.page = "Home"
@@ -317,6 +320,7 @@ with st.sidebar:
     else:
         logo_html += f'<h2 style="color: {COLORS["primary"]}; margin: 0; font-size: 1.8rem; line-height: 1.2;">🔬 MPsSpecXAI</h2>'
         logo_html += f'<p style="color: {COLORS["text_light"]}; font-size: 0.8rem; margin: 5px 0 0 0;">AI Microplastic Analysis</p>'
+
     logo_html += "</div>"
     st.markdown(logo_html, unsafe_allow_html=True)
 
@@ -598,7 +602,8 @@ elif st.session_state.page == "Dashboard":
                 prep_method = "Auto (Recommended)"
                 clean_signal = preprocess_signal(raw_signal, prep_method)
 
-                pred_cls, conf, full_name = predict_plastic(clean_signal)
+                # ✅ แก้ให้รับ proba_dict กลับมาด้วย
+                pred_cls, conf, full_name, proba_dict = predict_plastic(clean_signal)
 
                 st.session_state.results = {
                     "class": pred_cls,
@@ -608,6 +613,7 @@ elif st.session_state.page == "Dashboard":
                     "clean": clean_signal,
                     "method": prep_method,
                     "wavenumbers": st.session_state.data.columns.tolist(),
+                    "proba_dict": proba_dict,  # ✅ เก็บ prob ทุก class
                 }
 
             st.success("Analysis Complete!")
@@ -664,6 +670,39 @@ elif st.session_state.page == "Results":
     #     """,
     #         unsafe_allow_html=True,
     #     )
+
+    # ✅ ใส่ด้านขวาของ block Confidence (col_res3)
+    with col_res3:
+        proba_dict = res.get("proba_dict", None)
+        if proba_dict:
+            # sort จาก prob มาก -> น้อย
+            sorted_items = sorted(proba_dict.items(), key=lambda x: x[1], reverse=True)
+            labels = [k for k, _ in sorted_items]
+            values = [v for _, v in sorted_items]
+
+            st.markdown(
+                f"""
+            <div class="st-card" style="border-left: 4px solid {COLORS['secondary']};">
+                <p style="margin:0; color:{COLORS['text_light']}; font-size:0.9rem;">Polymer Class Distribution</p>
+                <p style="margin:0; font-size: 0.8rem; color:{COLORS['text_light']}80;">Model belief across all supported polymers</p>
+            """,
+                unsafe_allow_html=True,
+            )
+
+            fig_prob = px.bar(
+                x=labels,
+                y=values,
+                labels={"x": "Polymer", "y": "Probability (%)"},
+            )
+            fig_prob.update_layout(
+                height=260,
+                margin=dict(l=0, r=0, t=20, b=40),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color=COLORS["text"]),
+            )
+            st.plotly_chart(fig_prob, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("###  Spectrum Verification")
 
